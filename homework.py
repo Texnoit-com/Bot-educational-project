@@ -1,20 +1,23 @@
 """Модуль обработки состояние домашних заданий."""
+import http
 import logging
 import os
 import time
+from http import HTTPStatus
 
 import requests
 from dotenv import load_dotenv
 from telegram import Bot, TelegramError
 
 load_dotenv()
-PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
-TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
-TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
-RETRY_TIME = 600
-ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
-HEADERS = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
-HOMEWORK_STATUSES = {
+PRACTICUM_TOKEN: str = os.getenv('PRACTICUM_TOKEN')
+TELEGRAM_TOKEN: str = os.getenv('TELEGRAM_TOKEN')
+TELEGRAM_CHAT_ID: int = os.getenv('TELEGRAM_CHAT_ID')
+RETRY_TIME: int = 10000
+MONTH_AGO: int = 2690000
+ENDPOINT: str = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
+HEADERS: str = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
+HOMEWORK_STATUSES: dict = {
     'approved': 'Работа проверена: ревьюеру всё понравилось. Ура!',
     'reviewing': 'Работа взята на проверку ревьюером.',
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
@@ -30,24 +33,6 @@ logger = logging.getLogger(__name__)
 logger.addHandler(logging.StreamHandler())
 
 
-class Error200(Exception):
-    """Класс ошибки ответа сервера."""
-
-    pass
-
-
-class HomeworksError(Exception):
-    """Класс ошибки."""
-
-    pass
-
-
-class StatusError(Exception):
-    """Класс ошибки."""
-
-    pass
-
-
 def send_message(bot: Bot, message: str) -> None:
     """Формирование сообщения для бота."""
     try:
@@ -59,50 +44,58 @@ def send_message(bot: Bot, message: str) -> None:
 
 def get_api_answer(current_timestamp: int) -> dict:
     """Получения данных по API."""
-    timestamp = current_timestamp or int(time.time())
-    params = {'from_date': 1549962000} #1549962000
+    timestamp: int = current_timestamp or int(time.time())
+    params: dict = {'from_date': timestamp}
     try:
         response = requests.get(ENDPOINT,
                                 headers=HEADERS,
                                 params=params)
-        if response.status_code != 200:
+        if response.status_code != HTTPStatus.OK:
             logger.error('Страница недоступна')
-            raise Error200()
+            raise http.exceptions.HTTPError()
         return response.json()
     except requests.exceptions.RequestException as request_error:
-        logger.error(f'Ошиюка запроса {request_error}')
+        logger.error(f'Ошибка запроса {request_error}')
 
 
-def check_response(response: dict):
+def check_response(response: dict) -> list:
     """Проверка ответа API на корректность."""
-    if response.get('homeworks') is None:
-        logger.error('Нет объекта homeworks')
-        raise HomeworksError()
-    if response.get('homeworks') == []:
+    if type(response) is not dict:
+        raise TypeError('В функцию "check_response" поступил не словарь')
+    if 'homeworks' not in response:
+        raise KeyError('Ключ homeworks отсутствует')
+    if type(response['homeworks']) is not list:
+        raise TypeError('Объект homeworks не является списком')
+    if response['homeworks'] == []:
         return {}
-    if response.get('homeworks')[0].get('status') in HOMEWORK_STATUSES:
-        return response.get('homeworks')[0]
-    else:
-        logger.error('Неопределенный статус')
-        raise StatusError()
+    return response.get('homeworks')[0]
 
 
 def parse_status(homework: dict) -> str:
     """Парсинг ответа на запрос."""
+    if 'status' not in homework:
+        raise KeyError('Ключ status отсутствует в homework')
+    if type(homework) is not str:
+        homework_status = homework.get('status')
+    else:
+        homework_status = homework
+    if 'homework_name' not in homework:
+        raise KeyError('Ключ homework_name отсутствует в homework')
     homework_name = homework.get('homework_name')
-    homework_status = homework.get('status')
-    if homework_name is None:
-        logger.error('Пустое сообщение имени работы')
-        return 'В данный момент работа не сформированна'
-    if homework_status is None:
-        logger.error('Пустое сообщение статуса')
-        return f'В данный момент статус {homework_name} определяется'
+    if homework_status not in HOMEWORK_STATUSES:
+        raise ValueError()
     verdict = HOMEWORK_STATUSES[homework_status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
 def check_tokens() -> bool:
-    """Проверка наличия токенов."""
+    """Проверка наличия токенов.
+
+    Я бы сделал ее с приемом параметров, чтобы не использовать
+    глобальные константы. Будет сразу видно с какими параметрами
+    работает функция. Но в тестах она должна быть без параметров
+    Напишите ответ я правильно думаю?
+    """
     if PRACTICUM_TOKEN is None:
         logger.critical('Отсутствует PRACTICUM_TOKEN')
         return False
@@ -120,7 +113,7 @@ def main() -> None:
     if not check_tokens():
         exit()
     bot = Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = int(time.time())
+    current_timestamp = int(time.time()-MONTH_AGO)
     while True:
         try:
             response = get_api_answer(current_timestamp)
