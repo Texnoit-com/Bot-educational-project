@@ -55,6 +55,8 @@ def get_api_answer(current_timestamp: int) -> dict:
             logger.error('Страница недоступна')
             raise http.exceptions.HTTPError()
         return response.json()
+    except requests.exceptions.ConnectionError:
+        logger.error('Ошибка подключения')
     except requests.exceptions.RequestException as request_error:
         logger.error(f'Ошибка запроса {request_error}')
     except JSONDecodeError:
