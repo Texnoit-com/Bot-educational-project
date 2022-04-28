@@ -16,6 +16,7 @@ TELEGRAM_TOKEN: str = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID: int = os.getenv('TELEGRAM_CHAT_ID')
 RETRY_TIME: int = 10000
 MONTH_AGO: int = 2690000
+PERIOD_TIME: int = 18000
 ENDPOINT: str = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS: str = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 HOMEWORK_STATUSES: dict = {
@@ -75,12 +76,10 @@ def check_response(response: dict) -> dict:
 
 def parse_status(homework: dict) -> str:
     """Парсинг ответа на запрос."""
-    if 'status' not in homework:
+    if 'status' not in homework or type(homework) is str:
+        logger.error('Ключ status отсутствует в homework')
         raise KeyError('Ключ status отсутствует в homework')
-    if type(homework) is not str:
-        homework_status = homework.get('status')
-    else:
-        homework_status = homework
+    homework_status = homework.get('status')
     if 'homework_name' not in homework:
         raise KeyError('Ключ homework_name отсутствует в homework')
     homework_name = homework.get('homework_name')
@@ -104,7 +103,7 @@ def main() -> None:
     if not check_tokens():
         return exit()
     bot = Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = int(time.time() - MONTH_AGO)
+    current_timestamp = int(time.time()-MONTH_AGO)
     while True:
         try:
             response = get_api_answer(current_timestamp)
@@ -116,6 +115,7 @@ def main() -> None:
             message = f'Сбой в работе программы: {error}'
             logger.error(message)
         time.sleep(RETRY_TIME)
+        current_timestamp = int(time.time()-PERIOD_TIME)
 
 
 if __name__ == '__main__':
