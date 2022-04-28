@@ -7,6 +7,7 @@ from http import HTTPStatus
 
 import requests
 from dotenv import load_dotenv
+from simplejson.errors import JSONDecodeError
 from telegram import Bot, TelegramError
 
 load_dotenv()
@@ -38,7 +39,7 @@ def send_message(bot: Bot, message: str) -> None:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logger.info(f'Сообщение успешно отправленно: {message}')
     except TelegramError as error:
-        logger.error(f'Сообщение не оптправленно: {error}')
+        logger.error(f'Сообщение не отправленно: {error}')
 
 
 def get_api_answer(current_timestamp: int) -> dict:
@@ -55,9 +56,11 @@ def get_api_answer(current_timestamp: int) -> dict:
         return response.json()
     except requests.exceptions.RequestException as request_error:
         logger.error(f'Ошибка запроса {request_error}')
+    except JSONDecodeError:
+        logger.error('JSON не сформирован')
 
 
-def check_response(response: dict) -> list:
+def check_response(response: dict) -> dict:
     """Проверка ответа API на корректность."""
     if type(response) is not dict:
         raise TypeError('В функцию "check_response" поступил не словарь')
@@ -82,49 +85,37 @@ def parse_status(homework: dict) -> str:
         raise KeyError('Ключ homework_name отсутствует в homework')
     homework_name = homework.get('homework_name')
     if homework_status not in HOMEWORK_STATUSES:
-        raise ValueError()
+        raise ValueError('Значение не соответствует справочнику статусов')
     verdict = HOMEWORK_STATUSES[homework_status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
 
 
 def check_tokens() -> bool:
-    """Проверка наличия токенов.
-
-    Я бы сделал ее с приемом параметров, чтобы не использовать
-    глобальные константы. Будет сразу видно с какими параметрами
-    работает функция. Но в тестах она должна быть без параметров
-    Напишите ответ я правильно думаю?
-    """
-    if PRACTICUM_TOKEN is None:
-        logger.critical('Отсутствует PRACTICUM_TOKEN')
-        return False
-    if TELEGRAM_TOKEN is None:
-        logger.critical('Отсутствует TELEGRAM_TOKEN')
-        return False
-    if TELEGRAM_CHAT_ID is None:
-        logger.critical('Отсутствует TELEGRAM_CHAT_ID')
-        return False
+    """Проверка наличия токенов."""
+    for element in (PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID):
+        if element is None:
+            logger.critical('Отсутствует один из токенов')
+            return False
     return True
 
 
 def main() -> None:
     """Основная логика работы бота."""
     if not check_tokens():
-        exit()
+        return exit()
     bot = Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time() - MONTH_AGO)
     while True:
         try:
             response = get_api_answer(current_timestamp)
-            homeworks = check_response(response)
-            if homeworks:
-                message = parse_status(homeworks)
+            homework = check_response(response)
+            if homework:
+                message = parse_status(homework)
                 send_message(bot, message)
-                time.sleep(RETRY_TIME)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
-            logger.critical(message)
-            time.sleep(RETRY_TIME)
+            logger.error(message)
+        time.sleep(RETRY_TIME)
 
 
 if __name__ == '__main__':
