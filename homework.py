@@ -103,7 +103,7 @@ def main() -> None:
     if not check_tokens():
         return exit()
     bot = Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = int(time.time()-MONTH_AGO)
+    current_timestamp = int(time.time() - MONTH_AGO)
     while True:
         try:
             response = get_api_answer(current_timestamp)
@@ -115,7 +115,7 @@ def main() -> None:
             message = f'Сбой в работе программы: {error}'
             logger.error(message)
         time.sleep(RETRY_TIME)
-        current_timestamp = int(time.time()-PERIOD_TIME)
+        current_timestamp = int(time.time() - PERIOD_TIME)
 
 
 if __name__ == '__main__':
