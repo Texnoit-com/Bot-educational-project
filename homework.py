@@ -1,3 +1,5 @@
+"""Модуль обработки состояние домашних заданий."""
+
 import http
 import logging
 import os
@@ -90,9 +92,12 @@ def parse_status(homework: dict) -> str:
 
 def check_tokens() -> bool:
     """Проверка наличия токенов."""
-    for element in (PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID):
-        if element is None:
-            logger.critical(f'Токен не задан: {element=}',)
+    env_names: set = ('PRACTICUM_TOKEN',
+                      'TELEGRAM_TOKEN',
+                      'TELEGRAM_CHAT_ID')
+    for element in env_names:
+        if globals()[element] is None:
+            logger.critical(f'Токен не задан: {element}',)
             return False
     return True
 
