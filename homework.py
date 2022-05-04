@@ -1,6 +1,5 @@
 """Модуль обработки состояние домашних заданий."""
 
-
 import http
 import logging
 import os
