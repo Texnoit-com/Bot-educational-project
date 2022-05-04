@@ -16,7 +16,6 @@ TELEGRAM_TOKEN: str = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID: int = os.getenv('TELEGRAM_CHAT_ID')
 RETRY_TIME: int = 10000
 MONTH_AGO: int = 2690000
-PERIOD_TIME: int = 18000
 ENDPOINT: str = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS: str = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 HOMEWORK_STATUSES: dict = {
@@ -81,11 +80,11 @@ def parse_status(homework: dict) -> str:
     if 'status' not in homework or type(homework) is str:
         logger.error('Ключ status отсутствует в homework')
         raise KeyError('Ключ status отсутствует в homework')
-    homework_status = homework.get('status')
     if 'homework_name' not in homework:
         raise KeyError('Ключ homework_name отсутствует в homework')
     homework_name = homework.get('homework_name')
-    if homework_status not in HOMEWORK_STATUSES:
+    homework_status = homework.get('status')
+    if homework_status not in HOMEWORK_STATUSES.keys():
         raise ValueError('Значение не соответствует справочнику статусов')
     verdict = HOMEWORK_STATUSES[homework_status]
     return f'Изменился статус проверки работы "{homework_name}". {verdict}'
@@ -93,9 +92,10 @@ def parse_status(homework: dict) -> str:
 
 def check_tokens() -> bool:
     """Проверка наличия токенов."""
+
     for element in (PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID):
         if element is None:
-            logger.critical('Отсутствует один из токенов')
+            logger.critical(f'Токен не задан: {element=}',)
             return False
     return True
 
@@ -103,7 +103,7 @@ def check_tokens() -> bool:
 def main() -> None:
     """Основная логика работы бота."""
     if not check_tokens():
-        return exit()
+        raise requests.exceptions.TokenError('Отсутствует токен')
     bot = Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time() - MONTH_AGO)
     while True:
@@ -117,7 +117,7 @@ def main() -> None:
             message = f'Сбой в работе программы: {error}'
             logger.error(message)
         time.sleep(RETRY_TIME)
-        current_timestamp = int(time.time() - PERIOD_TIME)
+        current_timestamp = int(time.time() - RETRY_TIME)
 
 
 if __name__ == '__main__':
