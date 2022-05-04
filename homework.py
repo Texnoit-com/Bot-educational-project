@@ -5,7 +5,6 @@ import http
 import logging
 import os
 import time
-from http import HTTPStatus
 
 import requests
 from dotenv import load_dotenv
@@ -52,7 +51,7 @@ def get_api_answer(current_timestamp: int) -> dict:
         response = requests.get(ENDPOINT,
                                 headers=HEADERS,
                                 params=params)
-        if response.status_code != HTTPStatus.OK:
+        if response.status_code != http.HTTPStatus.OK:
             logger.error('Страница недоступна')
             raise http.exceptions.HTTPError()
         return response.json()
