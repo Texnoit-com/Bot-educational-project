@@ -4,10 +4,10 @@ import http
 import logging
 import os
 import time
+from json.decoder import JSONDecodeError
 
 import requests
 from dotenv import load_dotenv
-from simplejson.errors import JSONDecodeError
 from telegram import Bot, TelegramError
 
 load_dotenv()
