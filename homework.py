@@ -103,7 +103,7 @@ def check_tokens() -> bool:
 def main() -> None:
     """Основная логика работы бота."""
     if not check_tokens():
-        raise requests.exceptions.TokenError('Отсутствует токен')
+        raise ValueError ('Отсутствует токен')
     bot = Bot(token=TELEGRAM_TOKEN)
     current_timestamp = int(time.time() - MONTH_AGO)
     while True:
