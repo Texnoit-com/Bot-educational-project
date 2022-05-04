@@ -92,7 +92,6 @@ def parse_status(homework: dict) -> str:
 
 def check_tokens() -> bool:
     """Проверка наличия токенов."""
-
     for element in (PRACTICUM_TOKEN, TELEGRAM_TOKEN, TELEGRAM_CHAT_ID):
         if element is None:
             logger.critical(f'Токен не задан: {element=}',)
