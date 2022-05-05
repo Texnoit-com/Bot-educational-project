@@ -14,7 +14,7 @@ load_dotenv()
 PRACTICUM_TOKEN: str = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN: str = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID: int = os.getenv('TELEGRAM_CHAT_ID')
-RETRY_TIME: int = 10000
+RETRY_TIME: int = 600
 MONTH_AGO: int = 2690000
 ENDPOINT: str = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS: str = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
@@ -95,10 +95,14 @@ def check_tokens() -> bool:
     env_names: set = ('PRACTICUM_TOKEN',
                       'TELEGRAM_TOKEN',
                       'TELEGRAM_CHAT_ID')
+    error_env_names: set = set()
     for element in env_names:
         if globals()[element] is None:
-            logger.critical(f'Токен не задан: {element}',)
-            return False
+            error_env_names.add(element)
+    if len(error_env_names) != 0:
+        logger.critical('Токен не задан для элементов:'
+                        f'{" ,".join(error_env_names)}')
+        return False
     return True
 
 
@@ -117,6 +121,7 @@ def main() -> None:
                 send_message(bot, message)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
+            send_message(bot, message)
             logger.error(message)
         time.sleep(RETRY_TIME)
         current_timestamp = int(time.time() - RETRY_TIME)
