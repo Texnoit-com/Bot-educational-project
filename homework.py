@@ -8,14 +8,14 @@ from json.decoder import JSONDecodeError
 
 import requests
 from dotenv import load_dotenv
-from telegram import Bot, TelegramError
+from telegram import Bot, TelegramError, Update
+from telegram.ext import CallbackContext, CommandHandler, Updater
 
 load_dotenv()
 PRACTICUM_TOKEN: str = os.getenv('PRACTICUM_TOKEN')
 TELEGRAM_TOKEN: str = os.getenv('TELEGRAM_TOKEN')
 TELEGRAM_CHAT_ID: int = os.getenv('TELEGRAM_CHAT_ID')
 RETRY_TIME: int = 600
-MONTH_AGO: int = 2690000
 ENDPOINT: str = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
 HEADERS: str = {'Authorization': f'OAuth {PRACTICUM_TOKEN}'}
 HOMEWORK_STATUSES: dict = {
@@ -44,7 +44,7 @@ def send_message(bot: Bot, message: str) -> None:
 
 def get_api_answer(current_timestamp: int) -> dict:
     """Получения данных по API."""
-    timestamp: int = current_timestamp or int(time.time())
+    timestamp: int = current_timestamp
     params: dict = {'from_date': timestamp}
     try:
         response = requests.get(ENDPOINT,
@@ -106,14 +106,54 @@ def check_tokens() -> bool:
     return True
 
 
+def all_check_response(response: dict) -> dict:
+    """Проверка ответа API на корректность."""
+    if type(response) is not dict:
+        raise TypeError('В функцию "check_response" поступил не словарь')
+    if 'homeworks' not in response:
+        raise KeyError('Ключ homeworks отсутствует')
+    if type(response['homeworks']) is not list:
+        raise TypeError('Объект homeworks не является списком')
+    if response['homeworks'] == []:
+        return {}
+    return response.get('homeworks')
+
+
+def all_homeworks(update: Update, context: CallbackContext) -> None:
+    """Показать все задания."""
+    response = get_api_answer(0)
+    homeworks = all_check_response(response)
+    if homeworks:
+        rezult: list = list()
+        for homework in homeworks:
+            if 'status' not in homework or type(homework) is str:
+                logger.error('Ключ status отсутствует в homework')
+                raise KeyError('Ключ status отсутствует в homework')
+            if 'homework_name' not in homework:
+                raise KeyError('Ключ homework_name отсутствует в homework')
+            homework_name = homework.get('homework_name')
+            homework_status = homework.get('status')
+            if homework_status not in HOMEWORK_STATUSES.keys():
+                raise ValueError('Значение не соответствует'
+                                 'справочнику статусов')
+            verdict = HOMEWORK_STATUSES[homework_status]
+            rezult.append(f'--Работа "{homework_name}"'
+                          f'- статус {verdict}\n\r\n\r')
+    update.message.reply_text(f'{"".join(rezult)}')
+
+
 def main() -> None:
     """Основная логика работы бота."""
     if not check_tokens():
         raise ValueError('Отсутствует токен')
     bot = Bot(token=TELEGRAM_TOKEN)
-    current_timestamp = int(time.time() - MONTH_AGO)
+    updater = Updater(token=TELEGRAM_TOKEN)
+    current_timestamp = int(time.time())
     while True:
         try:
+            updater.dispatcher.add_handler(CommandHandler('all',
+                                                          all_homeworks))
+            updater.start_polling()
             response = get_api_answer(current_timestamp)
             homework = check_response(response)
             if homework:
